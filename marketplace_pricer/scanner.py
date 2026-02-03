@@ -16,7 +16,6 @@ from marketplace_pricer.connectors.craigslist_email import CraigslistSavedSearch
 from marketplace_pricer.connectors.facebook import FacebookMarketplaceConnector
 from marketplace_pricer.connectors.nextdoor import NextdoorConnector
 from marketplace_pricer.db import DB, WatchlistRow
-from marketplace_pricer.timeutil import utcnow_iso
 
 
 @dataclass(frozen=True)
@@ -202,9 +201,10 @@ class Scanner:
             }
 
         threshold = int(market_price_cents * under_market_pct)
+        is_under_market = listing.price_cents <= threshold
         return {
-            "should_alert": listing.price_cents <= threshold,
-            "reason": "under_market" if listing.price_cents <= threshold else "not_under_market",
+            "should_alert": is_under_market,
+            "reason": "under_market" if is_under_market else "not_under_market",
             "market_price_cents": market_price_cents,
             "threshold_cents": threshold,
         }
@@ -212,10 +212,9 @@ class Scanner:
     def _format_alert(self, listing: Listing, watchlist: WatchlistRow, decision: dict[str, Any]) -> AlertMessage:
         price = _fmt_money(listing.price_cents)
         title = listing.title or "(no title)"
-        market = _fmt_money(decision.get("market_price_cents"))
-        profit = None
-        if listing.price_cents is not None and decision.get("market_price_cents") is not None:
-            profit = decision["market_price_cents"] - listing.price_cents
+        market_cents = decision.get("market_price_cents")
+        market = _fmt_money(market_cents)
+        profit = None if listing.price_cents is None or market_cents is None else market_cents - listing.price_cents
 
         lines = [
             f"Watchlist: {watchlist.name} (id={watchlist.id}, source={watchlist.source})",

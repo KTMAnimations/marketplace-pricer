@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 import re
 import time
-from typing import Any
+from urllib.parse import quote_plus
 
 from playwright.sync_api import sync_playwright
 
@@ -13,7 +13,7 @@ from marketplace_pricer.db import WatchlistRow
 from marketplace_pricer.normalization import normalize_whitespace, parse_usd_to_cents
 
 
-_FB_ITEM_RE = re.compile(r"/marketplace/item/(?P<id>\\d+)")
+_FB_ITEM_RE = re.compile(r"/marketplace/item/(?P<id>\d+)")
 
 
 def _city_to_slug(city: str) -> str:
@@ -88,7 +88,7 @@ class FacebookMarketplaceConnector:
         city_slug = _city_to_slug(str(city))
 
         max_price = filters.get("max_price")
-        query = watchlist.query
+        query = quote_plus(watchlist.query)
 
         url = f"https://www.facebook.com/marketplace/{city_slug}/search?query={query}"
         if max_price is not None:
@@ -144,7 +144,7 @@ class FacebookMarketplaceConnector:
                         if maybe is not None:
                             price_cents = maybe
                             continue
-                    if title is None and (line and "$" not in line and "·" not in line):
+                    if title is None and "$" not in line and "·" not in line:
                         title = line
                         continue
 
@@ -174,4 +174,3 @@ class FacebookMarketplaceConnector:
             browser.close()
 
         return out
-

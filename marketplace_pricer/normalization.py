@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 
-_MONEY_RE = re.compile(r"(?P<sign>-)?\\$\\s*(?P<num>[0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
+_MONEY_RE = re.compile(r"(?P<sign>-)?\$\s*(?P<num>[0-9][0-9,]*(?:\.[0-9]{1,2})?)")
 
 
 def parse_usd_to_cents(text: str | None) -> int | None:
@@ -34,4 +34,3 @@ def normalize_whitespace(text: str | None) -> str | None:
     if text is None:
         return None
     return " ".join(text.split()).strip() or None
-

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 import sqlite3
-from typing import Any, Iterable
+from typing import Any
 
 from marketplace_pricer.timeutil import utcnow_iso
 
@@ -156,7 +156,7 @@ class DB:
             ).fetchall()
         watchlists: list[WatchlistRow] = []
         for row in rows:
-            filters = json.loads(row["filters_json"] or "{}")
+            filters = json_loads_or_empty(row["filters_json"])
             watchlists.append(
                 WatchlistRow(
                     id=int(row["id"]),

@@ -65,10 +65,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     try:
         from dotenv import load_dotenv
-
-        load_dotenv()
-    except Exception:
+    except ModuleNotFoundError:
         pass
+    else:
+        load_dotenv()
 
     parser = build_parser()
     args = parser.parse_args(argv)

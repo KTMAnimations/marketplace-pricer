@@ -14,7 +14,7 @@ from marketplace_pricer.db import WatchlistRow
 from marketplace_pricer.normalization import normalize_whitespace, parse_usd_to_cents
 
 
-_CL_URL_RE = re.compile(r"https?://[a-z0-9.-]+craigslist\\.org/[^\\s\"'<>]+", re.IGNORECASE)
+_CL_URL_RE = re.compile(r"https?://[a-z0-9.-]+craigslist\.org/[^\s\"'<>]+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -74,15 +74,10 @@ class CraigslistSavedSearchEmailConnector:
 
 def _message_body_html(msg: Message) -> str | None:
     if msg.is_multipart():
-        for part in msg.walk():
-            ctype = part.get_content_type()
-            if ctype == "text/html":
-                payload = part.get_payload(decode=True)
-                if payload:
-                    return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-        for part in msg.walk():
-            ctype = part.get_content_type()
-            if ctype == "text/plain":
+        for preferred_type in ("text/html", "text/plain"):
+            for part in msg.walk():
+                if part.get_content_type() != preferred_type:
+                    continue
                 payload = part.get_payload(decode=True)
                 if payload:
                     return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
@@ -118,4 +113,3 @@ def _extract_listings_from_message(msg: Message, *, watchlist: WatchlistRow) -> 
             )
         )
     return out
-
