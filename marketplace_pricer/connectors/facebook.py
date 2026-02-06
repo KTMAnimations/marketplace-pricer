@@ -16,6 +16,32 @@ from marketplace_pricer.normalization import normalize_whitespace, parse_usd_to_
 _FB_ITEM_RE = re.compile(r"/marketplace/item/(?P<id>\d+)")
 
 
+def _best_src_from_srcset(srcset: str | None) -> str | None:
+    if not srcset:
+        return None
+    # srcset format: "url1 240w, url2 480w, ..."
+    best_url = None
+    best_w = -1
+    for part in srcset.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        fields = part.split()
+        url = fields[0].strip()
+        if not url:
+            continue
+        w = -1
+        if len(fields) >= 2 and fields[1].endswith("w"):
+            try:
+                w = int(fields[1][:-1])
+            except Exception:
+                w = -1
+        if w >= best_w:
+            best_w = w
+            best_url = url
+    return best_url
+
+
 def _city_to_slug(city: str) -> str:
     # Mirrors the legacy example mapping from the bundled scraper; extend as needed.
     mapping = {
@@ -151,6 +177,15 @@ class FacebookMarketplaceConnector:
                 if lines:
                     location = lines[-1]
 
+                image_url = None
+                try:
+                    img = a.locator("img").first
+                    image_url = img.get_attribute("src")
+                    if not image_url:
+                        image_url = _best_src_from_srcset(img.get_attribute("srcset"))
+                except Exception:
+                    image_url = None
+
                 full_url = href
                 if href.startswith("/"):
                     full_url = f"https://www.facebook.com{href}"
@@ -164,7 +199,7 @@ class FacebookMarketplaceConnector:
                     currency="USD",
                     location=location,
                     seller=None,
-                    raw={"href": href, "text": text, "watchlist_id": watchlist.id},
+                    raw={"href": href, "text": text, "watchlist_id": watchlist.id, "image_url": image_url},
                 )
                 out.append(listing)
                 if external_id:

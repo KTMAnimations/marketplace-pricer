@@ -54,6 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
     scan_run = scan_sub.add_parser("run", help="Run scanner loop")
     scan_run.add_argument("--sleep", type=int, default=10, help="Seconds between loop iterations")
 
+    ui = sub.add_parser("ui", help="Run local mispricing dashboard")
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--port", type=int, default=7331)
+    ui.add_argument("--open", action="store_true", help="Open the dashboard in your browser")
+
     report = sub.add_parser("report", help="Reporting")
     report_sub = report.add_subparsers(dest="report_cmd", required=True)
     weekly = report_sub.add_parser("weekly", help="Weekly P&L from inventory table")
@@ -131,6 +136,31 @@ def main(argv: list[str] | None = None) -> int:
 
             print_weekly_report(db, weeks=int(args.weeks))
             return 0
+
+    if args.cmd == "ui":
+        db.init_schema()
+        try:
+            import uvicorn
+        except ModuleNotFoundError as exc:
+            raise SystemExit("Missing dependency: uvicorn. Install UI deps and retry.") from exc
+
+        from marketplace_pricer.ui.app import create_app
+
+        host = str(args.host)
+        port = int(args.port)
+        url = f"http://{host}:{port}"
+        print(f"[ui] starting dashboard at {url}")
+        if args.open:
+            try:
+                import webbrowser
+
+                webbrowser.open(url)
+            except Exception:
+                pass
+
+        app = create_app(settings=settings, db=db)
+        uvicorn.run(app, host=host, port=port, log_level="info")
+        return 0
 
     if args.cmd == "inventory":
         db.init_schema()

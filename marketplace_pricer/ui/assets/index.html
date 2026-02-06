@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mispricing Radar • Marketplace Pricer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div class="brandText">
+            <div class="kicker">Marketplace Pricer</div>
+            <h1>Mispricing Radar</h1>
+          </div>
+        </div>
+
+        <div class="topbarRight">
+          <div class="stats" id="stats">
+            <div class="stat">
+              <div class="statLabel">Deals</div>
+              <div class="statValue" id="statDeals">—</div>
+            </div>
+            <div class="stat">
+              <div class="statLabel">Saved</div>
+              <div class="statValue" id="statSaved">—</div>
+            </div>
+            <div class="stat">
+              <div class="statLabel">Dismissed</div>
+              <div class="statValue" id="statDismissed">—</div>
+            </div>
+          </div>
+          <div class="topActions">
+            <button class="btn btnGhost" id="btnRefresh" type="button">Refresh</button>
+            <a class="btn btnPrimary" href="/docs" target="_blank" rel="noreferrer">API</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="controls" aria-label="Filters">
+          <div class="controlRow">
+            <label class="control">
+              <span class="controlLabel">Search</span>
+              <input id="q" type="search" placeholder="macbook, drill, iPhone…" autocomplete="off" />
+            </label>
+
+            <label class="control">
+              <span class="controlLabel">Status</span>
+              <select id="status">
+                <option value="active">Active</option>
+                <option value="saved">Saved</option>
+                <option value="dismissed">Dismissed</option>
+                <option value="any">Any</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span class="controlLabel">Source</span>
+              <select id="source">
+                <option value="any">Any</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span class="controlLabel">Watchlist</span>
+              <select id="watchlist">
+                <option value="any">Any</option>
+              </select>
+            </label>
+
+            <label class="control controlSm">
+              <span class="controlLabel">Min spread</span>
+              <input id="minSpread" inputmode="numeric" type="text" placeholder="$0" />
+            </label>
+
+            <label class="control controlSm">
+              <span class="controlLabel">Max % of market</span>
+              <input id="maxPct" inputmode="decimal" type="text" placeholder="60" />
+            </label>
+
+            <label class="control">
+              <span class="controlLabel">Sort</span>
+              <select id="sort">
+                <option value="last_seen_desc">Recent</option>
+                <option value="spread_desc">Spread</option>
+                <option value="discount_desc">Discount</option>
+                <option value="price_asc">Price</option>
+              </select>
+            </label>
+
+            <label class="toggle">
+              <input id="onlyDeals" type="checkbox" checked />
+              <span class="toggleText">Only deals</span>
+            </label>
+          </div>
+
+          <div class="controlRow controlRowSecondary">
+            <label class="toggle">
+              <input id="onlyAlerted" type="checkbox" />
+              <span class="toggleText">Only alerted</span>
+            </label>
+            <label class="toggle">
+              <input id="includeUnpriced" type="checkbox" />
+              <span class="toggleText">Include unpriced</span>
+            </label>
+            <div class="hint" id="hintDb"></div>
+          </div>
+        </section>
+
+        <section class="list" aria-label="Mispricings">
+          <div class="empty" id="empty" hidden>
+            <h2>No deals yet</h2>
+            <p>
+              Run a scan to populate listings, then come back here. You can also uncheck “Only deals” to inspect all
+              priced items.
+            </p>
+          </div>
+
+          <div class="error" id="error" hidden>
+            <h2>Couldn’t load data</h2>
+            <p id="errorMessage"></p>
+          </div>
+
+          <div class="cards" id="cards" role="list"></div>
+        </section>
+      </main>
+
+      <div class="toast" id="toast" aria-live="polite" aria-atomic="true" hidden></div>
+    </div>
+
+    <template id="cardTpl">
+      <article class="card" role="listitem">
+        <div class="thumb">
+          <img class="thumbImg" alt="" loading="lazy" />
+          <div class="thumbFallback" aria-hidden="true"></div>
+        </div>
+
+        <div class="cardMain">
+          <div class="cardTop">
+            <div class="badges">
+              <span class="badge badgeSource" data-role="source"></span>
+              <span class="badge badgeWatchlist" data-role="watchlist" hidden></span>
+              <span class="badge badgeAlerted" data-role="alerted" hidden>Alerted</span>
+            </div>
+            <div class="time" data-role="lastSeen"></div>
+          </div>
+
+          <h3 class="title" data-role="title"></h3>
+          <p class="desc" data-role="desc"></p>
+
+          <div class="meta">
+            <span class="metaItem" data-role="location"></span>
+            <span class="metaDot" aria-hidden="true">•</span>
+            <span class="metaItem mono" data-role="key"></span>
+          </div>
+        </div>
+
+        <div class="cardMetrics">
+          <div class="metric">
+            <div class="metricLabel">Price</div>
+            <div class="metricValue" data-role="price"></div>
+          </div>
+          <div class="metric">
+            <div class="metricLabel">Market</div>
+            <div class="metricValue" data-role="market"></div>
+          </div>
+          <div class="metric metricSpread">
+            <div class="metricLabel">Spread</div>
+            <div class="metricValue mono" data-role="spread"></div>
+            <div class="metricSub mono" data-role="discount"></div>
+          </div>
+        </div>
+
+        <div class="cardActions">
+          <a class="btn btnSmall btnGhost" data-role="open" target="_blank" rel="noreferrer">Open</a>
+          <a class="btn btnSmall btnGhost" data-role="ebay" target="_blank" rel="noreferrer">eBay</a>
+          <button class="btn btnSmall btnGhost" data-role="copy" type="button">Copy</button>
+          <button class="btn btnSmall btnPrimary" data-role="save" type="button">Save</button>
+          <button class="btn btnSmall btnDanger" data-role="dismiss" type="button">Dismiss</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>
+

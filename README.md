@@ -74,6 +74,20 @@ Or once:
 python -m marketplace_pricer scan once
 ```
 
+## Local dashboard UI (mispricings)
+
+After you’ve run some scans (and ideally enabled eBay comps), launch the local dashboard:
+
+```bash
+python -m marketplace_pricer ui --open
+```
+
+This starts on `http://127.0.0.1:7331` by default (override with `--host` / `--port`).
+
+The UI shows deal cards with thumbnails (when available), listing title/summary, pricing spread vs market, plus quick
+actions (Open, eBay search, Copy link, Save, Dismiss). Save/Dismiss state is persisted in the `listings.status` column
+in SQLite.
+
 ## Weekly sells / P&L reporting
 
 Record a buy:
@@ -101,4 +115,3 @@ When you’re ready to go multi-user:
 - Move scans to a worker queue (Celery/RQ + Redis), per-user rate limits
 - Add auth (OAuth) + a UI to manage watchlists, locations, and alert channels
 - Add a “closed loop” outcomes table (contacted/bought/sold) to train pricing models and measure true ROI
-
