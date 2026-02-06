@@ -38,25 +38,35 @@ def _first_non_empty(*values: Any) -> Any:
 
 
 def _extract_image_url(raw: dict[str, Any]) -> str | None:
+    def _normalize(value: str) -> str | None:
+        v = value.strip()
+        if not v:
+            return None
+        if v.startswith(("http://", "https://", "data:", "/")):
+            return v
+        return "/" + v.lstrip("/")
+
     value = _first_non_empty(
+        raw.get("image_local_url"),
+        raw.get("image_local_path"),
         raw.get("image_url"),
         raw.get("image"),
         raw.get("thumbnail_url"),
         raw.get("thumbnail"),
     )
     if isinstance(value, str):
-        return value
+        return _normalize(value)
 
     for key in ("images", "image_urls", "photos", "photo_urls"):
         maybe = raw.get(key)
         if isinstance(maybe, list) and maybe:
             first = maybe[0]
             if isinstance(first, str) and first.strip():
-                return first
+                return _normalize(first) or first
             if isinstance(first, dict):
                 nested = _first_non_empty(first.get("url"), first.get("src"))
                 if isinstance(nested, str) and nested.strip():
-                    return nested
+                    return _normalize(nested) or nested
 
     return None
 
@@ -301,12 +311,16 @@ def create_app(*, settings: Settings, db: DB) -> FastAPI:
     if not assets_dir.exists():
         raise RuntimeError(f"UI assets directory missing: {assets_dir}")
 
+    images_dir = Path(settings.data_dir) / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
     app = FastAPI(
         title="Marketplace Pricer UI",
         version="0.1.0",
     )
 
     app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:

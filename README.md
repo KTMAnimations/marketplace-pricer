@@ -5,7 +5,7 @@ Local-first deal scanner + pricing pipeline with a path to a multi-user web app.
 This repo currently provides:
 - A SQLite-backed pipeline (`marketplace_pricer/`) for **watchlists → scans → stored listings → alerts → weekly reporting**
 - A Facebook Marketplace connector (Playwright) that uses **manual login + saved storage state** (no hard-coded passwords)
-- An eBay connector for **basic market-price estimation** (median of keyword search results)
+- An eBay Browse API integration for **market-price estimation** (median of keyword search results) and optional **eBay watchlist scans** (requires keys)
 - A Craigslist connector that ingests **Craigslist saved-search email alerts** via IMAP (compliance-friendly)
 - A stub for Nextdoor Marketplace via **official API** (requires access + token)
 
@@ -87,6 +87,9 @@ This starts on `http://127.0.0.1:7331` by default (override with `--host` / `--p
 The UI shows deal cards with thumbnails (when available), listing title/summary, pricing spread vs market, plus quick
 actions (Open, eBay search, Copy link, Save, Dismiss). Save/Dismiss state is persisted in the `listings.status` column
 in SQLite.
+
+If a listing includes an `image_url`, the scanner will try to download/cache it under `data/images/` and the UI will
+serve it locally at `/images/...` (more reliable than hotlinking).
 
 ## Weekly sells / P&L reporting
 

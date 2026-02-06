@@ -14,10 +14,14 @@ from marketplace_pricer.config import Settings
 
 @dataclass(frozen=True)
 class EbayItem:
+    item_id: str | None
     title: str | None
     url: str | None
     price_cents: int | None
     currency: str | None
+    image_url: str | None
+    location: str | None
+    seller: str | None
 
 
 class EbayBrowseClient:
@@ -112,12 +116,47 @@ class EbayBrowseClient:
                     cents = int(round(float(value) * 100))
                 except Exception:
                     cents = None
+
+            image_url = None
+            image = item.get("image")
+            if isinstance(image, dict):
+                image_url = image.get("imageUrl") or image.get("url")
+            if not image_url:
+                thumbs = item.get("thumbnailImages")
+                if isinstance(thumbs, list) and thumbs:
+                    first = thumbs[0]
+                    if isinstance(first, dict):
+                        image_url = first.get("imageUrl") or first.get("url")
+
+            location = None
+            loc = item.get("itemLocation")
+            if isinstance(loc, dict):
+                city = loc.get("city")
+                region = loc.get("stateOrProvince")
+                country = loc.get("country")
+                if city and region:
+                    location = f"{city}, {region}"
+                elif city and country:
+                    location = f"{city}, {country}"
+                elif region and country:
+                    location = f"{region}, {country}"
+                elif country:
+                    location = str(country)
+
+            seller = None
+            seller_info = item.get("seller") or {}
+            if isinstance(seller_info, dict):
+                seller = seller_info.get("username") or seller_info.get("sellerUsername")
             out.append(
                 EbayItem(
+                    item_id=item.get("itemId"),
                     title=item.get("title"),
                     url=item.get("itemWebUrl"),
                     price_cents=cents,
                     currency=currency,
+                    image_url=image_url,
+                    location=location,
+                    seller=seller,
                 )
             )
         return out
@@ -129,4 +168,3 @@ def estimate_market_price_cents(items: list[EbayItem]) -> int | None:
         return None
     prices.sort()
     return prices[len(prices) // 2]
-

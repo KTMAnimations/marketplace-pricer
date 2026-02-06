@@ -13,6 +13,7 @@ from marketplace_pricer.comps.ebay import EbayBrowseClient, estimate_market_pric
 from marketplace_pricer.config import Settings
 from marketplace_pricer.connectors.base import Connector, Listing
 from marketplace_pricer.connectors.craigslist_email import CraigslistSavedSearchEmailConnector, ImapConfig
+from marketplace_pricer.connectors.ebay import EbayMarketplaceConnector
 from marketplace_pricer.connectors.facebook import FacebookMarketplaceConnector
 from marketplace_pricer.connectors.nextdoor import NextdoorConnector
 from marketplace_pricer.db import DB, WatchlistRow
@@ -45,6 +46,7 @@ def build_alert_channels(settings: Settings) -> list[AlertChannel]:
 def build_connectors(settings: Settings) -> dict[str, Connector]:
     connectors: dict[str, Connector] = {
         "facebook": FacebookMarketplaceConnector(settings),
+        "ebay": EbayMarketplaceConnector(settings),
         "nextdoor": NextdoorConnector(settings),
     }
 
@@ -101,6 +103,25 @@ class Scanner:
             listings_seen += len(listings)
 
             for listing in listings:
+                raw = dict(listing.raw or {})
+                try:
+                    from marketplace_pricer.image_cache import cache_image_for_listing, extract_image_url
+
+                    image_url = extract_image_url(raw)
+                    if image_url:
+                        cached = cache_image_for_listing(
+                            self._settings,
+                            source=listing.source,
+                            unique_key=listing.unique_key,
+                            image_url=image_url,
+                        )
+                        if cached:
+                            rel_path, local_url = cached
+                            raw["image_local_path"] = rel_path
+                            raw["image_local_url"] = local_url
+                except Exception:
+                    pass
+
                 upsert = self._db.upsert_listing(
                     unique_key=listing.unique_key,
                     source=listing.source,
@@ -111,7 +132,7 @@ class Scanner:
                     currency=listing.currency,
                     location=listing.location,
                     seller=listing.seller,
-                    raw=listing.raw,
+                    raw=raw,
                 )
                 if upsert.is_new:
                     listings_new += 1

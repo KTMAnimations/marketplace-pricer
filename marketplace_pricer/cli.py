@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     wl_sub = wl.add_subparsers(dest="watchlist_cmd", required=True)
     wl_add = wl_sub.add_parser("add", help="Add a watchlist")
     wl_add.add_argument("--name", required=True)
-    wl_add.add_argument("--source", required=True, choices=["facebook", "craigslist_email", "nextdoor"])
+    wl_add.add_argument("--source", required=True, choices=["facebook", "ebay", "craigslist_email", "nextdoor"])
     wl_add.add_argument("--query", required=True)
     wl_add.add_argument("--filters", default="{}")
     wl_add.add_argument("--interval", type=int, default=300, help="Scan interval seconds")
