@@ -8,4 +8,4 @@ __pycache__/
 # Local data/artifacts
 data/
 output/
-
+.playwright-mcp/

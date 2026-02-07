@@ -10,6 +10,8 @@
 from playwright.sync_api import sync_playwright
 # The os library is used to get the environment variables.
 import os
+# Path is used to resolve storage state defaults.
+from pathlib import Path
 # The time library is used to add a delay to the script.
 import time
 # The BeautifulSoup library is used to parse the HTML.
@@ -57,6 +59,12 @@ def root():
 # Define a function to be executed when the endpoint is called.
 # Add a description to the function.
 def crawl_facebook_marketplace(city: str, query: str, max_price: int):
+    def _storage_state_path() -> Path:
+        # Prefer sharing state with the main app if present, otherwise allow override.
+        default_path = Path(__file__).resolve().parents[1] / "data" / "facebook_storage_state.json"
+        env = os.getenv("MP_FACEBOOK_STORAGE_STATE_PATH") or os.getenv("FB_STORAGE_STATE_PATH")
+        return Path(env) if env else default_path
+
     # Define dictionary of cities from the facebook marketplace directory for United States.
     # https://m.facebook.com/marketplace/directory/US/?_se_imp=0oey5sMRMSl7wluQZ
     # TODO - Add more cities to the dictionary.
@@ -121,26 +129,36 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
         
     # Define the URL to scrape.
     marketplace_url = f'https://www.facebook.com/marketplace/{city}/search/?query={query}&maxPrice={max_price}'
-    initial_url = "https://www.facebook.com/login/device-based/regular/login/"
     # Get listings of particular item in a particular city for a particular price.
     # Initialize the session using Playwright.
     with sync_playwright() as p:
         # Open a new browser page.
         browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        # Navigate to the URL.
-        page.goto(initial_url)
-        # Wait for the page to load.
-        time.sleep(2)
+        state_path = _storage_state_path()
+        context = browser.new_context(storage_state=str(state_path)) if state_path.exists() else browser.new_context()
+        page = context.new_page()
+        page.goto(marketplace_url, wait_until="domcontentloaded")
+
+        # If not already logged in, let the user complete login in the opened browser.
+        deadline = time.time() + 90
+        while time.time() < deadline:
+            try:
+                if page.locator("input[name='email'], input[name='pass']").count() > 0:
+                    time.sleep(1)
+                    continue
+                if "/marketplace/" in (page.url or ""):
+                    break
+            except Exception:
+                pass
+            time.sleep(1)
+
+        # Cache storage state once the user is logged in so subsequent calls can be headless/fast.
         try:
-            email_input = page.wait_for_selector('input[name="email"]').fill('YOUR_EMAIL_HERE')
-            password_input = page.wait_for_selector('input[name="pass"]').fill('YOUR_PASSWORD_HERE')
-            time.sleep(2)
-            login_button = page.wait_for_selector('button[name="login"]').click()
-            time.sleep(2)
-            page.goto(marketplace_url)
-        except:
-            page.goto(marketplace_url)
+            if not state_path.exists() and page.locator("input[name='email'], input[name='pass']").count() == 0:
+                state_path.parent.mkdir(parents=True, exist_ok=True)
+                context.storage_state(path=str(state_path))
+        except Exception:
+            pass
         # Wait for the page to load.
         time.sleep(2)
         # Infinite scroll to the bottom of the page until the loop breaks.
@@ -174,6 +192,7 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
             except:
                 pass
         # Close the browser.
+        context.close()
         browser.close()
         # Return the parsed data as a JSON.
         result = []

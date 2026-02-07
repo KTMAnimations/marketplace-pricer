@@ -11,14 +11,20 @@ supported_cities = ["New York", "Los Angeles", "Las Vegas", "Chicago", "Houston"
 
 # Take user input for the city, query, and max price.
 city = st.selectbox("City", supported_cities, 0)
-query = st.text_input("Query", "Macbook Pro")
-max_price = st.text_input("Max Price", "1000")
+query = st.text_input("Query", "")
+max_price = st.text_input("Max Price", "")
 
 # Create a button to submit the form.
 submit = st.button("Submit")
 
 # If the button is clicked.
 if submit:
+    if not query.strip():
+        st.error("Please enter a query.")
+        st.stop()
+    if not max_price.strip():
+        st.error("Please enter a max price.")
+        st.stop()
     # TODO - Remove any commas from the max_price before sending the request.
     if "," in max_price:
         max_price = max_price.replace(",", "")
