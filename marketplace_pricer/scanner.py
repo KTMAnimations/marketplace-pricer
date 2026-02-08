@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from marketplace_pricer.alerts.base import AlertChannel, AlertMessage
 from marketplace_pricer.alerts.console import ConsoleAlert
@@ -29,6 +30,25 @@ class ScanSummary:
 
 def _iso_to_dt(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _is_mock_listing(listing: Listing) -> bool:
+    """
+    Guardrail: ignore obvious synthetic/demo records so UI and alerts stay real-data only.
+    """
+    unique_key = (listing.unique_key or "").strip().lower()
+    external_id = (listing.external_id or "").strip().lower()
+
+    if unique_key.startswith("demo_") or external_id.startswith("demo_"):
+        return True
+
+    host = ""
+    try:
+        host = (urlparse(str(listing.url)).hostname or "").strip().lower()
+    except Exception:
+        host = ""
+
+    return host in {"example.com", "www.example.com"}
 
 
 def build_alert_channels(settings: Settings) -> list[AlertChannel]:
@@ -103,6 +123,13 @@ class Scanner:
             listings_seen += len(listings)
 
             for listing in listings:
+                if _is_mock_listing(listing):
+                    print(
+                        f"[scan] skipping synthetic listing source={listing.source} "
+                        f"unique_key={listing.unique_key!r} url={listing.url!r}"
+                    )
+                    continue
+
                 raw = dict(listing.raw or {})
                 try:
                     from marketplace_pricer.image_cache import cache_image_for_listing, extract_image_url
