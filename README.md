@@ -1,120 +1,56 @@
-# marketplace-pricer
+# Marketplace Pricer
 
-Local-first deal scanner + pricing pipeline with a path to a multi-user web app.
+I'm Roy Vaid. I run this on my laptop to catch listings on Facebook Marketplace and Craigslist that are going for well under their eBay price, and to get a ping when one shows up.
 
-This repo currently provides:
-- A SQLite-backed pipeline (`marketplace_pricer/`) for **watchlists → scans → stored listings → alerts → weekly reporting**
-- A Facebook Marketplace connector (Playwright) that uses **manual login + saved storage state** (no hard-coded passwords)
-- An eBay Browse API integration for **market-price estimation** (median of keyword search results) and optional **eBay watchlist scans** (requires keys)
-- A Craigslist connector that ingests **Craigslist saved-search email alerts** via IMAP (compliance-friendly)
-- A stub for Nextdoor Marketplace via **official API** (requires access + token)
+It started with an annoyance: the same used item sells for very different prices depending on where it is listed, and nobody selling an old camera on Facebook is checking what that camera closes for on eBay. Baye, Morgan and Scholten measured the gap years ago on an actual price comparison site, where buyers could see every offer at once, and the two lowest prices for identical electronics still differed by about 23 percent on average ([paper](https://ideas.repec.org/a/bla/jindec/v52y2004i4p463-496.html)). Marketplaces where buyers cannot compare are looser than that. I wanted to see how loose.
 
-Important: Scraping and automated access can violate site terms and may risk account bans. Use at your own risk and prefer official APIs where available.
+## How it works
 
-## Quickstart (single-user, local)
+A watchlist is a search ("iphone 14" near Boston, capped at $600) tied to a source and a scan interval. The scanner pulls current listings, looks each title up against the eBay Browse API, and takes the median of the comps as a rough market price. Facebook needs a real login, so the first run opens a browser and waits for me to sign in, then reuses that session on later scans. Craigslist comes in through saved-search email alerts over IMAP rather than scraping. Everything lands in a local SQLite file.
+
+A listing gets flagged when its asking price drops under a fraction of the eBay median I set per watchlist, 60 percent by default. Flags print to the console, and go to Discord or Telegram if I fill in the keys.
+
+## What it looks like
+
+![Mispricing Radar dashboard](docs/images/dashboard.png)
+
+The local dashboard, sorted by how far each listing sits under its eBay median. Save and dismiss write back to the database.
+
+![Asking price against eBay median](docs/images/price-gap.png)
+
+Each point is a listing from one set of scans. Most sit near the gray line, where the asking price matches the eBay median. The few that cross the dashed line, priced at or below 60 percent of median, are the ones worth a message.
+
+## Running it
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
-
 python -m marketplace_pricer init-db
 ```
 
-### 1) Facebook login (one-time)
-
-This opens a real browser; log in manually; then hit Enter in the terminal to save cookies/session state.
+Log in to Facebook once. This opens a browser; sign in, then press Enter in the terminal to save the session:
 
 ```bash
 python -m marketplace_pricer facebook-login
 ```
 
-Storage state is saved to `data/facebook_storage_state.json` by default (override with `MP_FACEBOOK_STORAGE_STATE_PATH`).
-
-### 2) Add a watchlist
-
-Example: Boston iPhone 14 scan, cap FB results at $600, and only alert when ≤ 60% of eBay median.
+Add a watchlist, run the scanner, open the dashboard:
 
 ```bash
 python -m marketplace_pricer watchlist add \
   --name "iPhone 14 (Boston)" \
   --source facebook \
   --query "iphone 14" \
-  --filters '{"city":"boston","max_price":600,"alert_under_market_pct":0.6,"alert_without_market_price":false}' \
+  --filters '{"city":"boston","max_price":600,"alert_under_market_pct":0.6}' \
   --interval 300
-```
 
-List watchlists:
-
-```bash
-python -m marketplace_pricer watchlist list
-```
-
-### 3) Configure pricing + alerts
-
-Copy `.env.example` to `.env` and fill what you want to enable:
-
-- eBay comps: `MP_EBAY_CLIENT_ID`, `MP_EBAY_CLIENT_SECRET`
-- Discord alerts: `MP_DISCORD_WEBHOOK_URL`
-- Telegram alerts: `MP_TELEGRAM_BOT_TOKEN`, `MP_TELEGRAM_CHAT_ID`
-- Craigslist email ingestion: `MP_IMAP_HOST`, `MP_IMAP_USERNAME`, `MP_IMAP_PASSWORD` (+ optional `MP_IMAP_FOLDER`)
-
-### 4) Run the scanner
-
-Run continuously:
-
-```bash
 python -m marketplace_pricer scan run
-```
-
-Or once:
-
-```bash
-python -m marketplace_pricer scan once
-```
-
-## Local dashboard UI (mispricings)
-
-After you’ve run some scans (and ideally enabled eBay comps), launch the local dashboard:
-
-```bash
 python -m marketplace_pricer ui --open
 ```
 
-This starts on `http://127.0.0.1:7331` by default (override with `--host` / `--port`).
+eBay comps, Discord, Telegram and Craigslist email each read their keys from `.env`; copy `.env.example` and fill in whichever you want. Without eBay keys you still get listings, there is just no market price to compare them against.
 
-The UI shows deal cards with thumbnails (when available), listing title/summary, pricing spread vs market, plus quick
-actions (Open, eBay search, Copy link, Save, Dismiss). Save/Dismiss state is persisted in the `listings.status` column
-in SQLite.
+## A note
 
-If a listing includes an `image_url`, the scanner will try to download/cache it under `data/images/` and the UI will
-serve it locally at `/images/...` (more reliable than hotlinking).
-
-## Weekly sells / P&L reporting
-
-Record a buy:
-
-```bash
-python -m marketplace_pricer inventory add --kind buy --amount-cents 50000 --fees-cents 0 --notes "FB pickup"
-```
-
-Record a sell:
-
-```bash
-python -m marketplace_pricer inventory add --kind sell --amount-cents 75000 --fees-cents 7000 --notes "eBay sale"
-```
-
-Print weekly rollups:
-
-```bash
-python -m marketplace_pricer report weekly --weeks 8
-```
-
-## Scaling path (website with user accounts + locations)
-
-When you’re ready to go multi-user:
-- Replace SQLite with Postgres, add `users` + `watchlists.user_id`
-- Move scans to a worker queue (Celery/RQ + Redis), per-user rate limits
-- Add auth (OAuth) + a UI to manage watchlists, locations, and alert channels
-- Add a “closed loop” outcomes table (contacted/bought/sold) to train pricing models and measure true ROI
+Scraping and automated access can break a site's terms and get an account banned. I keep this to my own use and lean on official APIs, eBay and the email route for Craigslist, where I can.
